@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Student Group Lookup</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 0; padding: 24px; max-width: 720px; }
+    .box { border: 1px solid #ddd; border-radius: 14px; padding: 16px; margin-top: 16px; }
+    input, button { font-size: 18px; padding: 10px 12px; }
+    button { cursor: pointer; }
+    .row { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .muted { color: #666; }
+    .result { margin-top: 12px; }
+    .pill { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Find your group</h1>
+  <p class="muted">Enter your date of birth (YYYY-MM-DD).</p>
+
+  <div class="box">
+    <div class="row">
+      <input id="dob" type="text" inputmode="numeric" placeholder="e.g. 2008-04-19" />
+      <button id="go">Lookup</button>
+    </div>
+    <div id="status" class="muted result"></div>
+    <div id="results" class="result"></div>
+  </div>
+
+  <script>
+    // Put your function URL here:
+    // Example: https://<project-ref>.supabase.co/functions/v1/lookup
+    const LOOKUP_URL = "PASTE_LOOKUP_FUNCTION_URL_HERE";
+
+    const $dob = document.getElementById("dob");
+    const $go = document.getElementById("go");
+    const $status = document.getElementById("status");
+    const $results = document.getElementById("results");
+
+    function setStatus(msg) { $status.textContent = msg; }
+    function escapeHtml(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+
+    async function lookup() {
+      const dob = $dob.value.trim();
+      $results.innerHTML = "";
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+        setStatus("Please enter DOB as YYYY-MM-DD.");
+        return;
+      }
+      setStatus("Searching…");
+
+      try {
+        const res = await fetch(LOOKUP_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dob })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          setStatus(data.message || "Something went wrong.");
+          return;
+        }
+
+        const matches = data.matches || [];
+        if (matches.length === 0) {
+          setStatus("No match found.");
+          return;
+        }
+
+        setStatus(`Found ${matches.length} match${matches.length === 1 ? "" : "es"}.`);
+
+        $results.innerHTML = matches.map(m => {
+          return `
+            <div class="box">
+              <div><strong>${escapeHtml(m.name)}</strong>
+                <span class="pill">Group ${escapeHtml(m.group_id)}</span>
+              </div>
+            </div>
+          `;
+        }).join("");
+      } catch (e) {
+        setStatus("Network error. Check Wi-Fi.");
+      }
+    }
+
+    $go.addEventListener("click", lookup);
+    $dob.addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
+  </script>
+</body>
+</html>
