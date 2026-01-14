@@ -73,25 +73,47 @@
   width: 100%;
 }
 
+/* This is important: makes widths behave predictably everywhere */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+.card {
+  padding: 28px;
+  overflow: hidden; /* keep Safari honest */
+}
+
+/* Wrapper defines the geometry */
+.field {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+/* Input fills wrapper, never exceeding it */
 .field input[type="date"] {
   display: block;
   width: 100%;
-  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
 
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
   background: #fff;
 
-  max-width: 100%;
-  min-width: 0;
+  /* iPad Safari: reduce “special control” layout weirdness */
+  -webkit-appearance: none;
+  appearance: none;
+
+  /* Final clamp: prevents subtle overflow */
+  overflow: hidden;
 }
 
-    input[type="date"]:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px var(--primary-soft);
-    }
+.field input[type="date"] {
+  padding-right: 22px;
+}
 
     button {
       width: 100%;
