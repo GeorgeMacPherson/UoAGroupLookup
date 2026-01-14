@@ -1,0 +1,154 @@
+// supabase/functions/upload/index.ts
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+function json(body: unknown, status = 200, origin = "*") {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Headers": "content-type",
+    },
+  });
+}
+
+function getOrigin(_req: Request) {
+  return Deno.env.get("CORS_ORIGIN") ?? "*";
+}
+
+function parseCsv(text: string) {
+  // Minimal CSV parser that handles commas and quotes well enough for typical rosters.
+  // Assumes first row is header.
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+
+    if (c === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (!inQuotes && (c === "," || c === "\n" || c === "\r")) {
+      if (c === "\r" && text[i + 1] === "\n") i++; // CRLF
+      row.push(field.trim());
+      field = "";
+      if (c === "\n" || c === "\r") {
+        if (row.some((x) => x.length > 0)) rows.push(row);
+        row = [];
+      }
+      continue;
+    }
+
+    field += c;
+  }
+
+  // last field
+  if (field.length || row.length) {
+    row.push(field.trim());
+    if (row.some((x) => x.length > 0)) rows.push(row);
+  }
+
+  if (rows.length < 2) return { header: [], records: [] };
+
+  const header = rows[0].map((h) => h.trim());
+  const records = rows.slice(1).map((r) => {
+    const obj: Record<string, string> = {};
+    for (let i = 0; i < header.length; i++) obj[header[i]] = (r[i] ?? "").trim();
+    return obj;
+  });
+
+  return { header, records };
+}
+
+Deno.serve(async (req) => {
+  const origin = getOrigin(req);
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": "content-type",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
+  }
+
+  if (req.method !== "POST") {
+    return json({ ok: false, message: "Use POST" }, 405, origin);
+  }
+
+  let payload: any;
+  try {
+    payload = await req.json();
+  } catch {
+    return json({ ok: false, message: "Invalid JSON" }, 400, origin);
+  }
+
+  const password = String(payload?.password ?? "");
+  const expected = Deno.env.get("UPLOAD_PASSWORD") ?? "";
+  if (!expected || password !== expected) {
+    return json({ ok: false, message: "Unauthorized" }, 401, origin);
+  }
+
+  const csvText = String(payload?.csv ?? "");
+  if (csvText.trim().length < 10) {
+    return json({ ok: false, message: "CSV is empty" }, 400, origin);
+  }
+
+  const { header, records } = parseCsv(csvText);
+
+  // Expect these exact headers:
+  const required = ["Name", "DOB", "Group identifier"];
+  for (const k of required) {
+    if (!header.includes(k)) {
+      return json(
+        { ok: false, message: `CSV missing header: ${k}. Found: ${header.join(", ")}` },
+        400,
+        origin
+      );
+    }
+  }
+
+  // Normalize rows
+  const rows = records
+    .map((r) => ({
+      name: String(r["Name"] ?? "").trim(),
+      dob: String(r["DOB"] ?? "").trim(), // must be YYYY-MM-DD
+      group_id: String(r["Group identifier"] ?? "").trim(),
+    }))
+    .filter((r) => r.name && r.dob && r.group_id);
+
+  // Basic validation
+  const badDob = rows.find((r) => !/^\d{4}-\d{2}-\d{2}$/.test(r.dob));
+  if (badDob) {
+    return json({ ok: false, message: `Bad DOB format for: ${badDob.name}. Use YYYY-MM-DD.` }, 400, origin);
+  }
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  // Replace all data (simple + reliable)
+  const { error: delErr } = await supabase.from("students").delete().neq("id", 0);
+  if (delErr) return json({ ok: false, message: delErr.message }, 500, origin);
+
+  // Insert in chunks
+  const chunkSize = 1000;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error: insErr } = await supabase.from("students").insert(chunk);
+    if (insErr) return json({ ok: false, message: insErr.message }, 500, origin);
+  }
+
+  return json({ ok: true, inserted: rows.length }, 200, origin);
+});
