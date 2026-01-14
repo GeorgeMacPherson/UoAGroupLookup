@@ -1,58 +1,188 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Student Group Lookup</title>
+  <title>Find Your Group</title>
+
   <style>
-    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 0; padding: 24px; max-width: 720px; }
-    .box { border: 1px solid #ddd; border-radius: 14px; padding: 16px; margin-top: 16px; }
-    input, button { font-size: 18px; padding: 10px 12px; }
-    button { cursor: pointer; }
-    .row { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .muted { color: #666; }
-    .result { margin-top: 12px; }
-    .pill { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; margin-left: 8px; }
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --primary: #2563eb;
+      --primary-soft: #e0e7ff;
+      --radius: 18px;
+      --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #eef2ff, var(--bg));
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 420px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin: 0 0 6px 0;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    input[type="date"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 1rem;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+    }
+
+    input[type="date"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-soft);
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px 16px;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 14px;
+      border: none;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: transform 0.05s ease, box-shadow 0.05s ease;
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+    }
+
+    button:active {
+      transform: translateY(1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .status {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .results {
+      margin-top: 20px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .result-card {
+      background: #f8fafc;
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .name {
+      font-weight: 600;
+    }
+
+    .group {
+      font-size: 0.85rem;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
   </style>
 </head>
-<body>
-  <h1>Find your group</h1>
-  <p class="muted">Enter your date of birth (YYYY-MM-DD).</p>
 
-  <div class="box">
-    <div class="row">
-      <input
-  id="dob"
-  type="date"
-  max="2099-12-31"
-/>
-      <button id="go">Lookup</button>
-    </div>
-    <div id="status" class="muted result"></div>
-    <div id="results" class="result"></div>
-  </div>
+<body>
+  <main class="app">
+    <section class="card">
+      <h1>Find your group</h1>
+      <div class="subtitle">Select your date of birth</div>
+
+      <label for="dob">Date of birth</label>
+      <input id="dob" type="date" />
+
+      <button id="go">Find my group</button>
+
+      <div id="status" class="status"></div>
+
+      <div id="results" class="results"></div>
+    </section>
+  </main>
 
   <script>
-    // Put your function URL here:
-    // Example: https://<project-ref>.supabase.co/functions/v1/lookup
     const LOOKUP_URL = "https://mtexrmbrtoiyqjmdjtow.supabase.co/functions/v1/lookup";
 
-    const $dob = document.getElementById("dob");
-    const $go = document.getElementById("go");
-    const $status = document.getElementById("status");
-    const $results = document.getElementById("results");
+    const dobInput = document.getElementById("dob");
+    const goBtn = document.getElementById("go");
+    const statusEl = document.getElementById("status");
+    const resultsEl = document.getElementById("results");
 
-    function setStatus(msg) { $status.textContent = msg; }
-    function escapeHtml(s){ return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+    function setStatus(msg) {
+      statusEl.textContent = msg || "";
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
 
     async function lookup() {
-      const dob = $dob.value.trim();
-      $results.innerHTML = "";
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
-        setStatus("Please enter DOB as YYYY-MM-DD.");
+      const dob = dobInput.value;
+      resultsEl.innerHTML = "";
+      if (!dob) {
+        setStatus("Please select your date of birth.");
         return;
       }
-      setStatus("Searching…");
+
+      setStatus("Looking up your group…");
 
       try {
         const res = await fetch(LOOKUP_URL, {
@@ -61,36 +191,32 @@
           body: JSON.stringify({ dob })
         });
 
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json();
         if (!res.ok || !data.ok) {
           setStatus(data.message || "Something went wrong.");
           return;
         }
 
-        const matches = data.matches || [];
-        if (matches.length === 0) {
+        if (!data.matches.length) {
           setStatus("No match found.");
           return;
         }
 
-        setStatus(`Found ${matches.length} match${matches.length === 1 ? "" : "es"}.`);
+        setStatus(`Found ${data.matches.length} result${data.matches.length > 1 ? "s" : ""}`);
 
-        $results.innerHTML = matches.map(m => {
-          return `
-            <div class="box">
-              <div><strong>${escapeHtml(m.name)}</strong>
-                <span class="pill">Group ${escapeHtml(m.group_id)}</span>
-              </div>
-            </div>
-          `;
-        }).join("");
-      } catch (e) {
-        setStatus("Network error. Check Wi-Fi.");
+        resultsEl.innerHTML = data.matches.map(m => `
+          <div class="result-card">
+            <div class="name">${escapeHtml(m.name)}</div>
+            <div class="group">Group ${escapeHtml(m.group_id)}</div>
+          </div>
+        `).join("");
+      } catch {
+        setStatus("Network error. Please try again.");
       }
     }
 
-    $go.addEventListener("click", lookup);
-    $dob.addEventListener("keydown", (e) => { if (e.key === "Enter") lookup(); });
+    goBtn.addEventListener("click", lookup);
+    dobInput.addEventListener("change", () => setStatus(""));
   </script>
 </body>
 </html>
