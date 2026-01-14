@@ -45,6 +45,7 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 28px;
+  overflow: hidden; /* <-- stops iPad date control from visually bleeding */
 }
 
     h1 {
@@ -68,13 +69,16 @@
     }
 
     input[type="date"] {
-      width: 100%;
-      padding: 14px 16px;
-      font-size: 1rem;
-      border-radius: 12px;
-      border: 1px solid #e5e7eb;
-      background: #fff;
-    }
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding: 14px 16px;
+  font-size: 1rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
 
     input[type="date"]:focus {
       outline: none;
