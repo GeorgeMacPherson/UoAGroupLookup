@@ -1,1 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Upload</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Arial, sans-serif; margin: 0; padding: 24px; max-width: 720px; }
+    .box { border: 1px solid #ddd; border-radius: 14px; padding: 16px; margin-top: 16px; }
+    input, button { font-size: 16px; padding: 10px 12px; }
+    button { cursor: pointer; }
+    .muted { color: #666; }
+    .row { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Admin: Upload roster CSV</h1>
+  <p class="muted">CSV headers must be: <code>Name, DOB, Group identifier</code> and DOB must be YYYY-MM-DD.</p>
 
+  <div class="box">
+    <div class="row">
+      <input id="password" type="password" placeholder="Upload password" />
+    </div>
+    <div class="row">
+      <input id="file" type="file" accept=".csv,text/csv" />
+      <button id="upload">Upload</button>
+    </div>
+    <div id="status" class="muted" style="margin-top:12px;"></div>
+    <pre id="log"></pre>
+  </div>
+
+  <script>
+    // Example: https://<project-ref>.supabase.co/functions/v1/upload
+    const UPLOAD_URL = "PASTE_UPLOAD_FUNCTION_URL_HERE";
+
+    const $password = document.getElementById("password");
+    const $file = document.getElementById("file");
+    const $upload = document.getElementById("upload");
+    const $status = document.getElementById("status");
+    const $log = document.getElementById("log");
+
+    function setStatus(msg) { $status.textContent = msg; }
+    function log(msg) { $log.textContent = msg; }
+
+    async function readFileAsText(file) {
+      return await file.text();
+    }
+
+    async function doUpload() {
+      const pw = $password.value;
+      const f = $file.files && $file.files[0];
+
+      log("");
+      if (!pw) { setStatus("Enter the upload password."); return; }
+      if (!f) { setStatus("Choose a CSV file."); return; }
+
+      setStatus("Reading CSV…");
+      const csv = await readFileAsText(f);
+
+      setStatus("Uploading…");
+      try {
+        const res = await fetch(UPLOAD_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: pw, csv })
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.ok) {
+          setStatus("Upload failed.");
+          log(data.message || "Unknown error.");
+          return;
+        }
+
+        setStatus(`Upload complete. Inserted ${data.inserted} students.`);
+      } catch (e) {
+        setStatus("Network error.");
+      }
+    }
+
+    $upload.addEventListener("click", doUpload);
+  </script>
+</body>
+</html>
